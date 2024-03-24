@@ -1,0 +1,45 @@
+import pandas as pd
+from newspaper import Article
+import time
+
+def scrape_and_update_csv(input_csv_path, output_csv_path):
+    df = pd.read_csv(input_csv_path)
+    article_texts = []
+    
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
+    
+    for url in df['URL']:
+        # Skip non-http URLs
+        if not url.startswith('http'):
+            article_texts.append("Non-HTTP URL, cannot retrieve article text")
+            continue
+        
+        try:
+            article = Article(url, browser_user_agent=headers['User-Agent'])
+            article.download()
+            article.parse()
+            
+            if article.is_parsed:
+                article_text = article.text
+                
+                # Check if the scraped text is empty or too short
+                if not article_text.strip() or len(article_text) < 100:
+                    article_text = "Error: Incomplete or empty article"
+            else:
+                article_text = "Error: Unable to parse article"
+        except Exception as e:
+            print(f"Error scraping URL {url}: {e}")
+            article_text = "Error: Could not scrape"
+        
+        article_texts.append(article_text)
+        
+        # Delay to respect rate limits
+        time.sleep(1)
+    
+    df.insert(loc=df.columns.get_loc('Headline') + 1, column='article text', value=article_texts)
+    df.to_csv(output_csv_path, index=False)
+
+# Example usage
+input_csv_path = "replace"
+output_csv_path = "replace"
+scrape_and_update_csv(input_csv_path, output_csv_path)
